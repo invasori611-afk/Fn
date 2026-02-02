@@ -2,227 +2,255 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Midnight Shift: The Paradox (FNAF Fan Game)</title>
+    <title>MIDNIGHT PARADOX: THE INTERROGATION</title>
     <style>
-        /* CSS - DESIGN E ANIMAÇÕES */
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; color: white; }
-        #game-container { position: relative; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; }
-        canvas { background: #111; image-rendering: pixelated; width: 100%; height: 100%; max-width: 1280px; max-height: 720px; }
-        
-        .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .clickable { pointer-events: auto; cursor: pointer; }
+        :root { --glitch-col: rgba(0, 255, 0, 0.1); }
+        body { margin: 0; background: #000; color: #0f0; font-family: 'Courier New', Courier, monospace; overflow: hidden; }
+        #game-container { position: relative; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        canvas { width: 100%; height: 100%; object-fit: contain; cursor: crosshair; }
 
-        /* Estática da Câmera */
-        #static-fx { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.05; background: url('https://media.giphy.com/media/oEI9uWUqnW3Fe/giphy.gif'); pointer-events: none; display: none; }
+        /* UI de Interrogatório Avançada */
+        #interrogation-wrap { position: absolute; bottom: 10%; width: 600px; background: rgba(0, 10, 0, 0.95); border: 1px solid #0f0; padding: 20px; display: none; box-shadow: 0 0 20px #040; }
+        #response-text { min-height: 60px; margin-bottom: 15px; border-bottom: 1px solid #030; padding-bottom: 10px; font-size: 18px; }
+        #input-area { display: flex; gap: 10px; }
+        input { background: #000; border: 1px solid #0f0; color: #0f0; padding: 10px; flex-grow: 1; outline: none; }
+        button { background: #030; border: 1px solid #0f0; color: #0f0; cursor: pointer; padding: 10px 20px; }
+        button:hover { background: #0f0; color: #000; }
 
-        /* Menu Styles */
-        .menu-btn { background: rgba(255, 255, 255, 0.1); border: 1px solid #fff; color: #fff; padding: 15px 40px; font-size: 20px; transition: 0.3s; margin: 10px; }
-        .menu-btn:hover { background: #fff; color: #000; }
+        /* Overlay de HUD */
+        .hud { position: absolute; top: 20px; left: 20px; pointer-events: none; z-index: 10; }
+        .cam-grid { position: absolute; bottom: 20px; right: 20px; display: none; grid-template-columns: repeat(3, 80px); gap: 5px; }
+        .cam-node { height: 40px; background: rgba(0, 255, 0, 0.1); border: 1px solid #0f0; color: #0f0; font-size: 10px; cursor: pointer; }
+        .cam-node:hover { background: rgba(0, 255, 0, 0.3); }
 
-        /* Jumpscare Flash */
-        @keyframes flash { 0% { opacity: 1; } 100% { opacity: 0; } }
-        .jumpscare-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: red; display: none; z-index: 999; }
+        /* Efeito de Scanline */
+        #scanlines { position: absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03)); background-size: 100% 2px, 3px 100%; pointer-events: none; }
     </style>
 </head>
 <body>
 
 <div id="game-container">
-    <canvas id="mainCanvas"></canvas>
-    <div id="static-fx"></div>
-    <div id="jumpscare" class="jumpscare-overlay"></div>
-    
-    <div id="ui-overlay" class="ui-layer"></div>
+    <div id="scanlines"></div>
+    <canvas id="screen"></canvas>
+
+    <div id="office-hud" class="hud">
+        <div>BATERIA: <span id="power-val">100</span>%</div>
+        <div id="time-val">12:00 AM</div>
+    </div>
+
+    <div id="cam-ui" class="cam-grid">
+        <button class="cam-node" onclick="setCam(1)">CAM 1: PALCO</button>
+        <button class="cam-node" onclick="setCam(2)">CAM 2: SALA 4</button>
+        <button class="cam-node" onclick="setCam(3)">CAM 3: COZINHA</button>
+        <button class="cam-node" onclick="setCam(4)">CAM 4: CORREDOR</button>
+        <button class="cam-node" onclick="setCam(5)">CAM 5: PORTA</button>
+        <button class="cam-node" onclick="closeCams()" style="background: #400">FECHAR</button>
+    </div>
+
+    <div id="interrogation-wrap">
+        <div style="font-size: 10px; color: #080;">ESTADO DO SUJEITO: <span id="subject-state">INSTÁVEL</span></div>
+        <div id="response-text">... aguardando pergunta ...</div>
+        <div id="input-area">
+            <input type="text" id="player-query" placeholder="Digite sua pergunta (ex: quem é você, por que, morte)...">
+            <button onclick="askQuestion()">ENVIAR</button>
+        </div>
+    </div>
 </div>
 
 <script>
 /**
- * MIDNIGHT SHIFT: THE PARADOX - ENGINE CORE
- * Desenvolvido como Fan Game de Five Nights at Freddy's
+ * ENGINE: PARADOX V3 - "INTELLIGENT INTERROGATOR"
  */
 
-const canvas = document.getElementById('mainCanvas');
+const canvas = document.getElementById('screen');
 const ctx = canvas.getContext('2d');
 canvas.width = 1280;
 canvas.height = 720;
 
-// CONFIGURAÇÃO GLOBAL
-const GameState = {
-    MENU: 0,
-    INTRO_CAR: 1,
-    TUTORIAL: 2,
-    OFFICE: 3,
-    CAMERAS: 4,
-    MINIGAME: 5,
-    JUMPSCARE: 6,
-    WIN: 7
+let gameState = 'MENU';
+let power = 100;
+let time = 0;
+let currentCam = 1;
+let mouseX = 640;
+let botPos = 1;
+let tension = 0;
+
+// Base de Dados de Respostas (Lore Dinâmica)
+const loreDB = {
+    "quem": ["Eu era apenas metal. Agora sou a memória dele.", "Um erro de design com uma alma humana."],
+    "por que": ["A fome de vingança é mais forte que a lógica.", "Ele nos deixou aqui para apodrecer."],
+    "morte": ["O que é a morte para quem nunca viveu?", "A morte foi apenas o começo do loop."],
+    "ajuda": ["Ninguém pode te ouvir no turno da meia-noite.", "A única ajuda é o fim da bateria."],
+    "onde": ["Estamos em todos os lugares. Nas paredes, nos fios.", "No lugar onde o tempo parou."]
 };
 
-let currentState = GameState.MENU;
-let currentNight = 1;
-let power = 100;
-let time = 0; // 0 a 120 (2 minutos)
-let camActive = 1;
-let animatronics = [
-    { name: "Shadow", pos: 1, aggro: 2, lastMove: 0 },
-    { name: "Echo", pos: 2, aggro: 1, lastMove: 0 }
-];
+// --- RENDERIZADOR ---
 
-// RECURSOS SONOROS (SINTETIZADOS)
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-function playTone(freq, duration, type = "sine") {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + duration);
-}
-
-// --- 1. TELA INICIAL ---
 function drawMenu() {
     ctx.fillStyle = "black";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    ctx.fillStyle = "white";
-    ctx.font = "60px Courier New";
-    ctx.fillText("MIDNIGHT SHIFT", 100, 200);
-    ctx.font = "20px Courier New";
-    ctx.fillText("THE PARADOX - FAN GAME", 100, 240);
-
-    ctx.fillStyle = Math.random() > 0.95 ? "#333" : "white"; // Efeito Glitch
-    ctx.fillText("> NEW GAME", 100, 400);
-    ctx.fillText("> CREDITS", 100, 450);
+    ctx.fillRect(0,0,1280,720);
+    ctx.fillStyle = "#0f0";
+    ctx.font = "40px 'Courier New'";
+    ctx.fillText("MIDNIGHT PARADOX", 100, 200);
+    ctx.font = "20px 'Courier New'";
+    ctx.fillText("> PRESSIONE PARA INICIAR TURNO", 100, 260);
 }
 
-// --- 3. INTRODUÇÃO (CARRO) ---
-let carPos = 0;
-let roadY = 0;
-function drawCarIntro() {
-    roadY += 10;
-    if (roadY > 100) roadY = 0;
-
-    ctx.fillStyle = "#050505";
-    ctx.fillRect(0,0, canvas.width, canvas.height);
-    
-    // Desenho da estrada (Pseudo-3D)
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 2;
-    for(let i=0; i<10; i++) {
-        ctx.beginPath();
-        ctx.moveTo(canvas.width/2 - (i*50), canvas.height);
-        ctx.lineTo(canvas.width/2 - (i*5), 300);
-        ctx.stroke();
-    }
-
-    // Carro do jogador
-    ctx.fillStyle = "red";
-    ctx.fillRect(canvas.width/2 - 50 + carPos, 500, 100, 60);
-    ctx.fillStyle = "black";
-    ctx.fillRect(canvas.width/2 - 40 + carPos, 510, 80, 20);
-
-    ctx.fillStyle = "white";
-    ctx.fillText("Use A/D para dirigir até a pizzaria", 500, 100);
-}
-
-// --- 5. MINI GAMES 2D (LORE) ---
-let miniPlayer = { x: 100, y: 500 };
-function drawMinigame() {
-    ctx.fillStyle = "purple"; // Estilo retro
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    ctx.fillStyle = "black"; // Jogador pixel
-    ctx.fillRect(miniPlayer.x, miniPlayer.y, 40, 80);
-    
-    ctx.fillStyle = "white";
-    ctx.font = "20px 'Press Start 2P', cursive";
-    ctx.fillText("ELE ESTÁ OBSERVANDO...", 300, 200);
-}
-
-// --- 6 & 7. ESCRITÓRIO E IA ---
 function drawOffice() {
-    // Gradiente para profundidade 3D simulada
-    let grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 50, canvas.width/2, canvas.height/2, 800);
-    grad.addColorStop(0, "#222");
-    grad.addColorStop(1, "black");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0,0, canvas.width, canvas.height);
-
-    // Mesa e Ventilação
-    ctx.fillStyle = "#111";
-    ctx.fillRect(400, 300, 480, 200);
+    const shift = (mouseX / window.innerWidth - 0.5) * 200;
     
-    // UI de Energia
-    ctx.fillStyle = "lime";
-    ctx.fillRect(50, 650, power * 2, 20);
-    ctx.fillText("POWER: " + Math.floor(power) + "%", 50, 640);
-    ctx.fillText("TIME: " + Math.floor(time/20) + " AM", 1100, 50);
+    // Geometria 3D do Escritório
+    ctx.fillStyle = "#050505";
+    ctx.fillRect(0,0,1280,720);
 
-    if (power <= 0) gameOver("FALTA DE ENERGIA");
+    // Parede de Fundo
+    ctx.fillStyle = "#111";
+    ctx.beginPath();
+    ctx.moveTo(200 + shift, 100);
+    ctx.lineTo(1080 + shift, 100);
+    ctx.lineTo(1180 + shift, 620);
+    ctx.lineTo(100 + shift, 620);
+    ctx.fill();
+
+    // Monitor do jogador
+    ctx.fillStyle = "#000";
+    ctx.fillRect(440 + shift, 450, 400, 250);
+    ctx.strokeStyle = "#0f0";
+    ctx.strokeRect(440 + shift, 450, 400, 250);
+
+    // Efeito de sombra lateral
+    ctx.fillStyle = "rgba(0,0,0,0.8)";
+    ctx.fillRect(0, 0, 150 + shift, 720);
+    ctx.fillRect(1130 + shift, 0, 150, 720);
+
+    ctx.fillStyle = "#0f0";
+    ctx.fillText("[ESPAÇO] PARA CAMERAS", 540 + shift, 600);
 }
 
-// LOGICA DE IA
-function updateAI() {
-    animatronics.forEach(ani => {
-        if (Math.random() * 1000 < ani.aggro * currentNight) {
-            ani.pos++;
-            console.log(ani.name + " moveu para sala " + ani.pos);
-            if (ani.pos > 5) triggerJumpscare(ani.name);
-        }
-    });
+function drawInterrogation() {
+    ctx.fillStyle = "black";
+    ctx.fillRect(0,0,1280,720);
+    
+    // O Animatrônico no escuro
+    const pulse = Math.sin(Date.now() / 200) * 5;
+    ctx.fillStyle = "#111";
+    ctx.beginPath();
+    ctx.arc(640, 300, 150 + pulse, 0, Math.PI*2);
+    ctx.fill();
+
+    // Olhos
+    ctx.fillStyle = tension > 50 ? "red" : "#0f0";
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.beginPath();
+    ctx.arc(580, 280, 10, 0, Math.PI*2);
+    ctx.arc(700, 280, 10, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
 }
 
-// --- 9. JUMPSCARE ---
-function triggerJumpscare(name) {
-    currentState = GameState.JUMPSCARE;
-    document.getElementById('jumpscare').style.display = 'block';
-    playTone(100, 1, "sawtooth");
-    setTimeout(() => {
-        location.reload();
-    }, 2000);
-}
+// --- LÓGICA DE INTERROGATÓRIO ---
 
-// LOOP PRINCIPAL
-function gameLoop() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    switch(currentState) {
-        case GameState.MENU: drawMenu(); break;
-        case GameState.INTRO_CAR: drawCarIntro(); break;
-        case GameState.OFFICE: 
-            drawOffice(); 
-            power -= 0.01 * (currentNight);
-            time += 0.01;
-            updateAI();
-            if(time > 120) { currentState = GameState.MINIGAME; time = 0; }
+function askQuestion() {
+    const input = document.getElementById('player-query');
+    const responseBox = document.getElementById('response-text');
+    const query = input.value.toLowerCase();
+    
+    let found = false;
+    for (let key in loreDB) {
+        if (query.includes(key)) {
+            const lines = loreDB[key];
+            responseBox.innerText = lines[Math.floor(Math.random() * lines.length)];
+            found = true;
+            tension += 10;
             break;
-        case GameState.MINIGAME: drawMinigame(); break;
+        }
     }
 
-    requestAnimationFrame(gameLoop);
+    if (!found) {
+        responseBox.innerText = "... ruído estático ... (Tente perguntar 'quem', 'morte', 'ajuda')";
+        tension += 15;
+    }
+
+    input.value = "";
+    updateTension();
 }
 
-// INPUTS
-window.addEventListener('keydown', (e) => {
-    if (currentState === GameState.INTRO_CAR) {
-        if (e.key === 'a') carPos -= 5;
-        if (e.key === 'd') carPos += 5;
-        if (Math.abs(carPos) > 200) currentState = GameState.OFFICE;
+function updateTension() {
+    if (tension >= 100) {
+        gameState = 'JUMPSCARE';
+        setTimeout(() => location.reload(), 1500);
     }
-    if (currentState === GameState.MENU) currentState = GameState.INTRO_CAR;
-    if (currentState === GameState.MINIGAME) {
-        if (e.key === 'ArrowRight') miniPlayer.x += 10;
-        if (miniPlayer.x > 1000) { currentNight++; currentState = GameState.OFFICE; miniPlayer.x = 100; }
+}
+
+// --- CONTROLE DE JOGO ---
+
+function update() {
+    if (gameState === 'OFFICE' || gameState === 'CAMERAS') {
+        power -= 0.005;
+        time += 0.01;
+        document.getElementById('power-val').innerText = Math.floor(power);
+        document.getElementById('time-val').innerText = Math.floor(time/20) + 12 + ":00 AM";
+
+        if (time > 120) startInterrogation();
+        if (power <= 0) gameState = 'JUMPSCARE';
+    }
+}
+
+function startInterrogation() {
+    gameState = 'INTERROGATION';
+    document.getElementById('office-hud').style.display = 'none';
+    document.getElementById('cam-ui').style.display = 'none';
+    document.getElementById('interrogation-wrap').style.display = 'block';
+}
+
+function setCam(id) {
+    currentCam = id;
+    gameState = 'CAMERAS';
+}
+
+function closeCams() {
+    gameState = 'OFFICE';
+    document.getElementById('cam-ui').style.display = 'none';
+}
+
+function loop() {
+    ctx.clearRect(0,0,1280,720);
+    
+    if (gameState === 'MENU') drawMenu();
+    else if (gameState === 'OFFICE') drawOffice();
+    else if (gameState === 'CAMERAS') {
+        ctx.fillStyle = "black"; ctx.fillRect(0,0,1280,720);
+        ctx.fillStyle = "#0f0"; ctx.fillText("GRAVAÇÃO AO VIVO - CAM " + currentCam, 50, 50);
+        if (Math.random() > 0.9) ctx.fillRect(0,0,1280,720); // Glitch
+    }
+    else if (gameState === 'INTERROGATION') drawInterrogation();
+    else if (gameState === 'JUMPSCARE') {
+        ctx.fillStyle = "red"; ctx.fillRect(0,0,1280,720);
+        ctx.fillStyle = "black"; ctx.font = "100px Impact"; ctx.fillText("SISTEMA VIOLADO", 300, 400);
+    }
+
+    update();
+    requestAnimationFrame(loop);
+}
+
+// Eventos
+window.addEventListener('mousemove', e => mouseX = e.clientX);
+window.addEventListener('keydown', e => {
+    if (e.code === 'Space') {
+        if (gameState === 'OFFICE') {
+            gameState = 'CAMERAS';
+            document.getElementById('cam-ui').style.display = 'grid';
+        } else if (gameState === 'CAMERAS') {
+            closeCams();
+        }
     }
 });
+window.addEventListener('mousedown', () => {
+    if (gameState === 'MENU') gameState = 'OFFICE';
+});
 
-// Inicialização
-playTone(200, 0.1);
-gameLoop();
-
+loop();
 </script>
 </body>
 </html>
