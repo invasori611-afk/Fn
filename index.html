@@ -2,188 +2,102 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PARADOX 3D MOBILE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animação Trindade</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; background: #000; color: #0f0; font-family: 'Courier New', monospace; overflow: hidden; touch-action: none; }
-        #container { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
-        canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
-        
-        /* Controles Mobile */
-        .mobile-btn { position: absolute; background: rgba(0, 255, 0, 0.1); border: 1px solid #0f0; color: #0f0; padding: 15px; z-index: 100; text-transform: uppercase; font-size: 12px; }
-        #btn-cam { bottom: 20px; right: 20px; width: 80px; height: 80px; border-radius: 50%; }
-        #btn-interrogate { bottom: 20px; left: 20px; display: none; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-        /* HUD */
-        .stats { position: absolute; top: 10px; left: 10px; font-size: 14px; pointer-events: none; text-shadow: 1px 1px #000; }
-        
-        /* Interrogatório Input */
-        #chat-wrap { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; background: rgba(0,0,0,0.9); border: 2px solid #0f0; padding: 15px; display: none; z-index: 200; }
-        input { width: 100%; background: #000; border: 1px solid #0f0; color: #0f0; padding: 10px; box-sizing: border-box; margin-top: 10px; }
+        body {
+            background-color: #050505;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Cinzel', serif;
+        }
+
+        .container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Estilização do Tridente (SVG) */
+        .tridente {
+            position: absolute;
+            width: 250px; /* Tamanho ideal para celular */
+            fill: rgba(255, 215, 0, 0.2); /* Dourado suave/transparente */
+            filter: blur(2px);
+            opacity: 0;
+            transform: translateY(50px) scale(0.8);
+            animation: surgeTridente 2s ease-out forwards;
+        }
+
+        /* Estilização do Nome */
+        .nome {
+            position: relative;
+            font-size: 3rem;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            text-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700;
+            opacity: 0;
+            animation: surgeNome 1.5s ease-out 1s forwards;
+            z-index: 2;
+        }
+
+        /* Animação do Tridente */
+        @keyframes surgeTridente {
+            0% {
+                opacity: 0;
+                transform: translateY(50px) scale(0.8);
+            }
+            100% {
+                opacity: 0.6;
+                transform: translateY(0) scale(1.1);
+                filter: blur(0px) drop-shadow(0 0 15px #ffd700);
+            }
+        }
+
+        /* Animação do Nome */
+        @keyframes surgeNome {
+            0% {
+                opacity: 0;
+                letter-spacing: 20px;
+                filter: blur(10px);
+            }
+            100% {
+                opacity: 1;
+                letter-spacing: 5px;
+                filter: blur(0px);
+            }
+        }
+
+        /* Ajuste para telas muito pequenas */
+        @media (max-width: 400px) {
+            .nome { font-size: 2.2rem; }
+            .tridente { width: 180px; }
+        }
     </style>
 </head>
 <body>
 
-<div id="container">
-    <canvas id="gameCanvas"></canvas>
-    
-    <div class="stats">
-        BATERIA: <span id="pwr">100</span>%<br>
-        HORA: <span id="tm">12</span> AM
+    <div class="container">
+        <svg class="tridente" viewBox="0 0 512 512">
+            <path d="M448 32h-16c-8.8 0-16 7.2-16 16v96c0 53-43 96-96 96s-96-43-96-96V48c0-8.8-7.2-16-16-16h-16c-8.8 0-16 7.2-16 16v96c0 53-43 96-96 96s-96-43-96-96V48c0-8.8-7.2-16-16-16H64c-8.8 0-16 7.2-16 16v96c0 84.4 65.4 153.6 148.1 159.5L192 480c0 17.7 14.3 32 32 32h64c17.7 0 32-14.3 32-32V303.5c82.7-5.9 148.1-75.1 148.1-159.5V48c0-8.8-7.2-16-16-16z"/>
+        </svg>
+
+        <h1 class="nome">Trindade</h1>
     </div>
 
-    <button id="btn-cam" class="mobile-btn" onclick="toggleCams()">CAM</button>
-    
-    <div id="chat-wrap">
-        <div id="ai-response">O QUE VOCÊ QUER SABER?</div>
-        <input type="text" id="ai-input" placeholder="Toque aqui para perguntar...">
-        <button class="mobile-btn" style="position:static; width:100%; margin-top:10px" onclick="processQuestion()">ENVIAR</button>
-    </div>
-</div>
-
-<script>
-/**
- * ENGINE: MOBILE RAYCASTER 3D (FNAF EDITION)
- * Renderização de ambiente 3D via projeção matemática.
- */
-
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-let w, h;
-
-function resize() {
-    w = canvas.width = window.innerWidth;
-    h = canvas.height = window.innerHeight;
-}
-window.addEventListener('resize', resize);
-resize();
-
-// Estado do Jogo
-let state = 'OFFICE';
-let power = 100;
-let time = 0;
-let lookX = 0; // Olhar lateral (Mobile Swipe)
-let touchStartX = 0;
-
-// Configuração 3D do Escritório
-const map = {
-    cols: 8, rows: 8, size: 100,
-    data: [
-        1,1,1,1,1,1,1,1,
-        1,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,1,
-        1,1,1,1,1,1,1,1
-    ]
-};
-
-// --- RENDERIZADOR 3D (RAYCASTING) ---
-function draw3D() {
-    // Chão e Teto
-    ctx.fillStyle = "#050505"; ctx.fillRect(0, 0, w, h/2);
-    ctx.fillStyle = "#111"; ctx.fillRect(0, h/2, w, h/2);
-
-    const fov = 60 * Math.PI / 180;
-    const step = fov / w;
-    const rayAngleStart = (lookX * 0.005) - (fov / 2);
-
-    for (let i = 0; i < w; i += 2) {
-        let rayAngle = rayAngleStart + (i * step);
-        let dist = 0;
-        let x = 400, y = 400; // Posição fixa do jogador
-        
-        // Simulação de colisão de raio
-        while(dist < 500) {
-            dist += 2;
-            let cx = x + Math.cos(rayAngle) * dist;
-            let cy = y + Math.sin(rayAngle) * dist;
-            
-            let mi = Math.floor(cy / map.size) * map.cols + Math.floor(cx / map.size);
-            if (map.data[mi] === 1) {
-                // Renderiza coluna da parede
-                let wallH = (map.size * h) / (dist * Math.cos(rayAngle - (lookX * 0.005)));
-                let brightness = Math.max(0, 255 - dist/2);
-                ctx.fillStyle = `rgb(0, ${brightness/4}, 0)`;
-                ctx.fillRect(i, (h - wallH)/2, 2, wallH);
-                break;
-            }
-        }
-    }
-}
-
-// --- SISTEMA DE INTERROGATÓRIO ---
-function startInterrogation() {
-    state = 'INTERROGATION';
-    document.getElementById('chat-wrap').style.display = 'block';
-    document.getElementById('btn-cam').style.display = 'none';
-}
-
-function processQuestion() {
-    const input = document.getElementById('ai-input');
-    const res = document.getElementById('ai-response');
-    const val = input.value.toLowerCase();
-    
-    if(val.includes("quem")) res.innerText = "EU SOU O QUE RESTOU DO METAL.";
-    else if(val.includes("onde")) res.innerText = "ESTAMOS ATRÁS DAS CÂMERAS.";
-    else if(val.includes("morte")) res.innerText = "DÓI MENOS QUE O REINÍCIO.";
-    else res.innerText = "... (RUÍDO MECÂNICO) ...";
-    
-    input.value = "";
-    // Adiciona tremor de tela (Tensão)
-    lookX += (Math.random() - 0.5) * 50;
-}
-
-// --- LOOP E CONTROLES ---
-function update() {
-    if (state === 'OFFICE') {
-        power -= 0.002;
-        time += 0.01;
-        document.getElementById('pwr').innerText = Math.floor(power);
-        document.getElementById('tm').innerText = Math.floor(time/20) + 12;
-        
-        if (time > 120) startInterrogation();
-        if (power <= 0) location.reload();
-    }
-}
-
-function loop() {
-    ctx.clearRect(0,0,w,h);
-    if (state === 'OFFICE') draw3D();
-    else if (state === 'INTERROGATION') {
-        ctx.fillStyle = "black"; ctx.fillRect(0,0,w,h);
-        // Desenha "olhos" 3D
-        ctx.fillStyle = "red";
-        ctx.beginPath();
-        ctx.arc(w/2 - 50, h/2 - 100, 10, 0, 7);
-        ctx.arc(w/2 + 50, h/2 - 100, 10, 0, 7);
-        ctx.fill();
-    }
-    update();
-    requestAnimationFrame(loop);
-}
-
-// Gestos Mobile (Swipe para olhar)
-canvas.addEventListener('touchstart', e => {
-    touchStartX = e.touches[0].clientX;
-});
-canvas.addEventListener('touchmove', e => {
-    let diff = e.touches[0].clientX - touchStartX;
-    lookX += diff * 2;
-    touchStartX = e.touches[0].clientX;
-});
-
-function toggleCams() {
-    // Efeito Glitch ao mudar
-    ctx.fillStyle = "white"; ctx.fillRect(0,0,w,h);
-    setTimeout(() => {
-        alert("SISTEMA DE CÂMERAS FORA DE AR - MANUTENÇÃO NECESSÁRIA");
-    }, 50);
-}
-
-loop();
-</script>
 </body>
 </html>
