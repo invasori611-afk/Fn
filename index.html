@@ -2,253 +2,186 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>MIDNIGHT PARADOX: THE INTERROGATION</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PARADOX 3D MOBILE</title>
     <style>
-        :root { --glitch-col: rgba(0, 255, 0, 0.1); }
-        body { margin: 0; background: #000; color: #0f0; font-family: 'Courier New', Courier, monospace; overflow: hidden; }
-        #game-container { position: relative; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        canvas { width: 100%; height: 100%; object-fit: contain; cursor: crosshair; }
+        body { margin: 0; background: #000; color: #0f0; font-family: 'Courier New', monospace; overflow: hidden; touch-action: none; }
+        #container { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+        canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+        
+        /* Controles Mobile */
+        .mobile-btn { position: absolute; background: rgba(0, 255, 0, 0.1); border: 1px solid #0f0; color: #0f0; padding: 15px; z-index: 100; text-transform: uppercase; font-size: 12px; }
+        #btn-cam { bottom: 20px; right: 20px; width: 80px; height: 80px; border-radius: 50%; }
+        #btn-interrogate { bottom: 20px; left: 20px; display: none; }
 
-        /* UI de Interrogatório Avançada */
-        #interrogation-wrap { position: absolute; bottom: 10%; width: 600px; background: rgba(0, 10, 0, 0.95); border: 1px solid #0f0; padding: 20px; display: none; box-shadow: 0 0 20px #040; }
-        #response-text { min-height: 60px; margin-bottom: 15px; border-bottom: 1px solid #030; padding-bottom: 10px; font-size: 18px; }
-        #input-area { display: flex; gap: 10px; }
-        input { background: #000; border: 1px solid #0f0; color: #0f0; padding: 10px; flex-grow: 1; outline: none; }
-        button { background: #030; border: 1px solid #0f0; color: #0f0; cursor: pointer; padding: 10px 20px; }
-        button:hover { background: #0f0; color: #000; }
-
-        /* Overlay de HUD */
-        .hud { position: absolute; top: 20px; left: 20px; pointer-events: none; z-index: 10; }
-        .cam-grid { position: absolute; bottom: 20px; right: 20px; display: none; grid-template-columns: repeat(3, 80px); gap: 5px; }
-        .cam-node { height: 40px; background: rgba(0, 255, 0, 0.1); border: 1px solid #0f0; color: #0f0; font-size: 10px; cursor: pointer; }
-        .cam-node:hover { background: rgba(0, 255, 0, 0.3); }
-
-        /* Efeito de Scanline */
-        #scanlines { position: absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03)); background-size: 100% 2px, 3px 100%; pointer-events: none; }
+        /* HUD */
+        .stats { position: absolute; top: 10px; left: 10px; font-size: 14px; pointer-events: none; text-shadow: 1px 1px #000; }
+        
+        /* Interrogatório Input */
+        #chat-wrap { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; background: rgba(0,0,0,0.9); border: 2px solid #0f0; padding: 15px; display: none; z-index: 200; }
+        input { width: 100%; background: #000; border: 1px solid #0f0; color: #0f0; padding: 10px; box-sizing: border-box; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-<div id="game-container">
-    <div id="scanlines"></div>
-    <canvas id="screen"></canvas>
-
-    <div id="office-hud" class="hud">
-        <div>BATERIA: <span id="power-val">100</span>%</div>
-        <div id="time-val">12:00 AM</div>
+<div id="container">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div class="stats">
+        BATERIA: <span id="pwr">100</span>%<br>
+        HORA: <span id="tm">12</span> AM
     </div>
 
-    <div id="cam-ui" class="cam-grid">
-        <button class="cam-node" onclick="setCam(1)">CAM 1: PALCO</button>
-        <button class="cam-node" onclick="setCam(2)">CAM 2: SALA 4</button>
-        <button class="cam-node" onclick="setCam(3)">CAM 3: COZINHA</button>
-        <button class="cam-node" onclick="setCam(4)">CAM 4: CORREDOR</button>
-        <button class="cam-node" onclick="setCam(5)">CAM 5: PORTA</button>
-        <button class="cam-node" onclick="closeCams()" style="background: #400">FECHAR</button>
-    </div>
-
-    <div id="interrogation-wrap">
-        <div style="font-size: 10px; color: #080;">ESTADO DO SUJEITO: <span id="subject-state">INSTÁVEL</span></div>
-        <div id="response-text">... aguardando pergunta ...</div>
-        <div id="input-area">
-            <input type="text" id="player-query" placeholder="Digite sua pergunta (ex: quem é você, por que, morte)...">
-            <button onclick="askQuestion()">ENVIAR</button>
-        </div>
+    <button id="btn-cam" class="mobile-btn" onclick="toggleCams()">CAM</button>
+    
+    <div id="chat-wrap">
+        <div id="ai-response">O QUE VOCÊ QUER SABER?</div>
+        <input type="text" id="ai-input" placeholder="Toque aqui para perguntar...">
+        <button class="mobile-btn" style="position:static; width:100%; margin-top:10px" onclick="processQuestion()">ENVIAR</button>
     </div>
 </div>
 
 <script>
 /**
- * ENGINE: PARADOX V3 - "INTELLIGENT INTERROGATOR"
+ * ENGINE: MOBILE RAYCASTER 3D (FNAF EDITION)
+ * Renderização de ambiente 3D via projeção matemática.
  */
 
-const canvas = document.getElementById('screen');
+const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-canvas.width = 1280;
-canvas.height = 720;
+let w, h;
 
-let gameState = 'MENU';
+function resize() {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Estado do Jogo
+let state = 'OFFICE';
 let power = 100;
 let time = 0;
-let currentCam = 1;
-let mouseX = 640;
-let botPos = 1;
-let tension = 0;
+let lookX = 0; // Olhar lateral (Mobile Swipe)
+let touchStartX = 0;
 
-// Base de Dados de Respostas (Lore Dinâmica)
-const loreDB = {
-    "quem": ["Eu era apenas metal. Agora sou a memória dele.", "Um erro de design com uma alma humana."],
-    "por que": ["A fome de vingança é mais forte que a lógica.", "Ele nos deixou aqui para apodrecer."],
-    "morte": ["O que é a morte para quem nunca viveu?", "A morte foi apenas o começo do loop."],
-    "ajuda": ["Ninguém pode te ouvir no turno da meia-noite.", "A única ajuda é o fim da bateria."],
-    "onde": ["Estamos em todos os lugares. Nas paredes, nos fios.", "No lugar onde o tempo parou."]
+// Configuração 3D do Escritório
+const map = {
+    cols: 8, rows: 8, size: 100,
+    data: [
+        1,1,1,1,1,1,1,1,
+        1,0,0,0,0,0,0,1,
+        1,0,0,0,0,0,0,1,
+        1,0,0,0,0,0,0,1,
+        1,0,0,0,0,0,0,1,
+        1,0,0,0,0,0,0,1,
+        1,0,0,0,0,0,0,1,
+        1,1,1,1,1,1,1,1
+    ]
 };
 
-// --- RENDERIZADOR ---
+// --- RENDERIZADOR 3D (RAYCASTING) ---
+function draw3D() {
+    // Chão e Teto
+    ctx.fillStyle = "#050505"; ctx.fillRect(0, 0, w, h/2);
+    ctx.fillStyle = "#111"; ctx.fillRect(0, h/2, w, h/2);
 
-function drawMenu() {
-    ctx.fillStyle = "black";
-    ctx.fillRect(0,0,1280,720);
-    ctx.fillStyle = "#0f0";
-    ctx.font = "40px 'Courier New'";
-    ctx.fillText("MIDNIGHT PARADOX", 100, 200);
-    ctx.font = "20px 'Courier New'";
-    ctx.fillText("> PRESSIONE PARA INICIAR TURNO", 100, 260);
-}
+    const fov = 60 * Math.PI / 180;
+    const step = fov / w;
+    const rayAngleStart = (lookX * 0.005) - (fov / 2);
 
-function drawOffice() {
-    const shift = (mouseX / window.innerWidth - 0.5) * 200;
-    
-    // Geometria 3D do Escritório
-    ctx.fillStyle = "#050505";
-    ctx.fillRect(0,0,1280,720);
-
-    // Parede de Fundo
-    ctx.fillStyle = "#111";
-    ctx.beginPath();
-    ctx.moveTo(200 + shift, 100);
-    ctx.lineTo(1080 + shift, 100);
-    ctx.lineTo(1180 + shift, 620);
-    ctx.lineTo(100 + shift, 620);
-    ctx.fill();
-
-    // Monitor do jogador
-    ctx.fillStyle = "#000";
-    ctx.fillRect(440 + shift, 450, 400, 250);
-    ctx.strokeStyle = "#0f0";
-    ctx.strokeRect(440 + shift, 450, 400, 250);
-
-    // Efeito de sombra lateral
-    ctx.fillStyle = "rgba(0,0,0,0.8)";
-    ctx.fillRect(0, 0, 150 + shift, 720);
-    ctx.fillRect(1130 + shift, 0, 150, 720);
-
-    ctx.fillStyle = "#0f0";
-    ctx.fillText("[ESPAÇO] PARA CAMERAS", 540 + shift, 600);
-}
-
-function drawInterrogation() {
-    ctx.fillStyle = "black";
-    ctx.fillRect(0,0,1280,720);
-    
-    // O Animatrônico no escuro
-    const pulse = Math.sin(Date.now() / 200) * 5;
-    ctx.fillStyle = "#111";
-    ctx.beginPath();
-    ctx.arc(640, 300, 150 + pulse, 0, Math.PI*2);
-    ctx.fill();
-
-    // Olhos
-    ctx.fillStyle = tension > 50 ? "red" : "#0f0";
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = ctx.fillStyle;
-    ctx.beginPath();
-    ctx.arc(580, 280, 10, 0, Math.PI*2);
-    ctx.arc(700, 280, 10, 0, Math.PI*2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-}
-
-// --- LÓGICA DE INTERROGATÓRIO ---
-
-function askQuestion() {
-    const input = document.getElementById('player-query');
-    const responseBox = document.getElementById('response-text');
-    const query = input.value.toLowerCase();
-    
-    let found = false;
-    for (let key in loreDB) {
-        if (query.includes(key)) {
-            const lines = loreDB[key];
-            responseBox.innerText = lines[Math.floor(Math.random() * lines.length)];
-            found = true;
-            tension += 10;
-            break;
+    for (let i = 0; i < w; i += 2) {
+        let rayAngle = rayAngleStart + (i * step);
+        let dist = 0;
+        let x = 400, y = 400; // Posição fixa do jogador
+        
+        // Simulação de colisão de raio
+        while(dist < 500) {
+            dist += 2;
+            let cx = x + Math.cos(rayAngle) * dist;
+            let cy = y + Math.sin(rayAngle) * dist;
+            
+            let mi = Math.floor(cy / map.size) * map.cols + Math.floor(cx / map.size);
+            if (map.data[mi] === 1) {
+                // Renderiza coluna da parede
+                let wallH = (map.size * h) / (dist * Math.cos(rayAngle - (lookX * 0.005)));
+                let brightness = Math.max(0, 255 - dist/2);
+                ctx.fillStyle = `rgb(0, ${brightness/4}, 0)`;
+                ctx.fillRect(i, (h - wallH)/2, 2, wallH);
+                break;
+            }
         }
     }
-
-    if (!found) {
-        responseBox.innerText = "... ruído estático ... (Tente perguntar 'quem', 'morte', 'ajuda')";
-        tension += 15;
-    }
-
-    input.value = "";
-    updateTension();
 }
 
-function updateTension() {
-    if (tension >= 100) {
-        gameState = 'JUMPSCARE';
-        setTimeout(() => location.reload(), 1500);
-    }
-}
-
-// --- CONTROLE DE JOGO ---
-
-function update() {
-    if (gameState === 'OFFICE' || gameState === 'CAMERAS') {
-        power -= 0.005;
-        time += 0.01;
-        document.getElementById('power-val').innerText = Math.floor(power);
-        document.getElementById('time-val').innerText = Math.floor(time/20) + 12 + ":00 AM";
-
-        if (time > 120) startInterrogation();
-        if (power <= 0) gameState = 'JUMPSCARE';
-    }
-}
-
+// --- SISTEMA DE INTERROGATÓRIO ---
 function startInterrogation() {
-    gameState = 'INTERROGATION';
-    document.getElementById('office-hud').style.display = 'none';
-    document.getElementById('cam-ui').style.display = 'none';
-    document.getElementById('interrogation-wrap').style.display = 'block';
+    state = 'INTERROGATION';
+    document.getElementById('chat-wrap').style.display = 'block';
+    document.getElementById('btn-cam').style.display = 'none';
 }
 
-function setCam(id) {
-    currentCam = id;
-    gameState = 'CAMERAS';
+function processQuestion() {
+    const input = document.getElementById('ai-input');
+    const res = document.getElementById('ai-response');
+    const val = input.value.toLowerCase();
+    
+    if(val.includes("quem")) res.innerText = "EU SOU O QUE RESTOU DO METAL.";
+    else if(val.includes("onde")) res.innerText = "ESTAMOS ATRÁS DAS CÂMERAS.";
+    else if(val.includes("morte")) res.innerText = "DÓI MENOS QUE O REINÍCIO.";
+    else res.innerText = "... (RUÍDO MECÂNICO) ...";
+    
+    input.value = "";
+    // Adiciona tremor de tela (Tensão)
+    lookX += (Math.random() - 0.5) * 50;
 }
 
-function closeCams() {
-    gameState = 'OFFICE';
-    document.getElementById('cam-ui').style.display = 'none';
+// --- LOOP E CONTROLES ---
+function update() {
+    if (state === 'OFFICE') {
+        power -= 0.002;
+        time += 0.01;
+        document.getElementById('pwr').innerText = Math.floor(power);
+        document.getElementById('tm').innerText = Math.floor(time/20) + 12;
+        
+        if (time > 120) startInterrogation();
+        if (power <= 0) location.reload();
+    }
 }
 
 function loop() {
-    ctx.clearRect(0,0,1280,720);
-    
-    if (gameState === 'MENU') drawMenu();
-    else if (gameState === 'OFFICE') drawOffice();
-    else if (gameState === 'CAMERAS') {
-        ctx.fillStyle = "black"; ctx.fillRect(0,0,1280,720);
-        ctx.fillStyle = "#0f0"; ctx.fillText("GRAVAÇÃO AO VIVO - CAM " + currentCam, 50, 50);
-        if (Math.random() > 0.9) ctx.fillRect(0,0,1280,720); // Glitch
+    ctx.clearRect(0,0,w,h);
+    if (state === 'OFFICE') draw3D();
+    else if (state === 'INTERROGATION') {
+        ctx.fillStyle = "black"; ctx.fillRect(0,0,w,h);
+        // Desenha "olhos" 3D
+        ctx.fillStyle = "red";
+        ctx.beginPath();
+        ctx.arc(w/2 - 50, h/2 - 100, 10, 0, 7);
+        ctx.arc(w/2 + 50, h/2 - 100, 10, 0, 7);
+        ctx.fill();
     }
-    else if (gameState === 'INTERROGATION') drawInterrogation();
-    else if (gameState === 'JUMPSCARE') {
-        ctx.fillStyle = "red"; ctx.fillRect(0,0,1280,720);
-        ctx.fillStyle = "black"; ctx.font = "100px Impact"; ctx.fillText("SISTEMA VIOLADO", 300, 400);
-    }
-
     update();
     requestAnimationFrame(loop);
 }
 
-// Eventos
-window.addEventListener('mousemove', e => mouseX = e.clientX);
-window.addEventListener('keydown', e => {
-    if (e.code === 'Space') {
-        if (gameState === 'OFFICE') {
-            gameState = 'CAMERAS';
-            document.getElementById('cam-ui').style.display = 'grid';
-        } else if (gameState === 'CAMERAS') {
-            closeCams();
-        }
-    }
+// Gestos Mobile (Swipe para olhar)
+canvas.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
 });
-window.addEventListener('mousedown', () => {
-    if (gameState === 'MENU') gameState = 'OFFICE';
+canvas.addEventListener('touchmove', e => {
+    let diff = e.touches[0].clientX - touchStartX;
+    lookX += diff * 2;
+    touchStartX = e.touches[0].clientX;
 });
+
+function toggleCams() {
+    // Efeito Glitch ao mudar
+    ctx.fillStyle = "white"; ctx.fillRect(0,0,w,h);
+    setTimeout(() => {
+        alert("SISTEMA DE CÂMERAS FORA DE AR - MANUTENÇÃO NECESSÁRIA");
+    }, 50);
+}
 
 loop();
 </script>
